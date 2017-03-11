@@ -1,10 +1,6 @@
+#!/usr/bin/env python
 
-# coding: utf-8
-
-# # Customize Enviornment
-
-# In[1]:
-
+import click
 import logging
 import os
 from datetime import datetime
@@ -17,10 +13,7 @@ import psycopg2
 import json
 from random import random
 from time import sleep
-from pprint import pprint
 
-
-# In[2]:
 
 # enable logging
 logging.basicConfig(level=logging.INFO,
@@ -30,44 +23,7 @@ logger = logging.getLogger()
 logger.setLevel(logging.INFO)
 
 
-# In[ ]:
-
-
-
-
-# # Establish Database Connection
-
-# In[3]:
-
-# connect to the database
-conn = psycopg2.connect(database="postgres",
-                        user="postgres",
-                        password="apassword",
-                        host="localhost")
-
-# enable autocommit
-conn.autocommit = True
-
-# define the cursor to be able to write to the database
-cur = conn.cursor()
-
-
-# In[4]:
-
-# create the table if it doesn't exist
-cur.execute("""CREATE TABLE IF NOT EXISTS backpage_raw 
-               (id SERIAL PRIMARY KEY NOT NULL, 
-               ad JSONB)""") 
-
-
-# In[ ]:
-
-
-
-
-# # Functions
-
-# In[5]:
+##### HELPER FUNCTIONS ##### 
 
 def create_output_dir(path):
 
@@ -88,30 +44,6 @@ def create_output_dir(path):
         
     return out_path
 
-
-# In[6]:
-
-def create_urls_to_scrape():
-    
-    import params
-    
-    # load categories and cites from parameters file
-    categories = params.categories
-    cities = params.cities
-    
-    # create all possible urls
-    landing_urls = []
-    for category in categories:
-        for city in cities:
-            url = "http://" + city + ".backpage.com/" + category + "/"
-            landing_urls.append(url)
-            
-    logging.info("Number of landing pages to scrape: {}".format(len(landing_urls)))
-    
-    return landing_urls
-
-
-# In[8]:
 
 def get_urls(landing_page):
     
@@ -139,7 +71,7 @@ def get_urls(landing_page):
                 urls.append(element.a["href"])
                 
             # log event
-            logger.info("Success: {}".format(url))
+            #logger.info("Success: {}".format(url))
 
             # increment page number by 1
             page_num += 1
@@ -149,15 +81,13 @@ def get_urls(landing_page):
         
         # if no links are found, stop
         else:
-            logger.info("No more pages available")
+            #logger.info("No more pages available")
             break
             
-    logger.info("Number of URLs in {} - {}: {}".format(city, category, len(urls)))
+    logger.info("Number of ads in {} - {}: {}".format(city, category, len(urls)))
     
     return urls
 
-
-# In[9]:
 
 def fetch_imgs(url, i, img_path):
     
@@ -187,8 +117,6 @@ def fetch_imgs(url, i, img_path):
     return ad_imgs
 
 
-# In[10]:
-
 def store_html_in_dict(url):
     
     response = urllib2.urlopen(url)
@@ -201,91 +129,92 @@ def store_html_in_dict(url):
     return data
 
 
-# In[11]:
-
-def iter_urls(urls, img_path, get_imgs = True):
-    
-    for i, url in enumerate(urls):
-        
-        # store HTML data in dict
-        ad = store_html_in_dict(url)
-        
-        if get_imgs is True:
-            
-            # store images in local directory
-            ad_imgs = fetch_imgs(url, i, img_path)
-        
-            # add image paths to data
-            ad['img_paths'] = ad_imgs
-
-            # count the number of images
-            ad['num_imgs'] = len(ad_imgs)
-        
-        # insert ad into table
-        cur.execute("INSERT INTO backpage_raw (ad) VALUES (%s)", [json.dumps(ad)])
-        
-        # sleep for a hot minute...
-        sleep(1)
-        
-    logger.info("Number of ads collected: {}".format(i + 1))
+##### MAIN PROGRAM #####
 
 
-# In[12]:
+@click.command()
+@click.option('--get_imgs/--no_imgs', default = False, help = 'Options to download all images from the ads (default: no_imgs)')
+@click.option('--category_file', default = './categories.txt', help = 'File for TXT file of categories to scrape (default: ./categories.txt')
+@click.option('--city_file', default = './cities.txt', help = 'File for TXT file of cities to scrape (default: ./cities.txt')
+def cli(get_imgs, category_file, city_file):
 
-def scrape_city_category(landing_page = "", get_imgs = False):
-    
-    # set blank img_path
-    img_path = ""
-    
-    # if you want to scrape images as well
+    """Web scraper for collecting ad information"""
+
+    try:
+
+        # connect to the database
+        conn = psycopg2.connect(database="postgres",
+                                user="postgres",
+                                password="apassword",
+                                host="localhost")
+
+        # enable autocommit
+        conn.autocommit = True
+
+        # define the cursor to be able to write to the database
+        cur = conn.cursor()
+
+        # create the table if it doesn't exist
+        cur.execute("""CREATE TABLE IF NOT EXISTS backpage_raw 
+                       (id SERIAL PRIMARY KEY NOT NULL, 
+                       ad JSONB)""")
+
+        logging.info("Successfully connected to the database")
+
+    except:
+        logging.info("Unable to connect to the database")
+
+
+    # if you want to get images, create directory to store images
     if get_imgs is True:
-        
-        # estalish output directory
-        path = "/home/curtis/Github/Analytic-Projects/state_police/backpage"
+        path = "/home/curtis/Github/frontPage"
         img_path = create_output_dir(path)
-        
-    # get URLS to scrape
-    urls = get_urls(landing_page)
-        
-    # iterate through urls and store data
-    iter_urls(urls, img_path, get_imgs = get_imgs)
 
+    # load cities and categories to scrape
+    categories = set(line.lower().strip() for line in open(category_file))
+    cities = set(line.lower().strip() for line in open(city_file))
 
-# In[13]:
-
-def scrape_all(get_imgs = False):
+    # create all possible city/category combinations
+    city_category = []
+    for city in cities:
+        for category in categories:
+            city_category.append((city, category))
     
-    # define urls to crawl
-    landing_urls = create_urls_to_scrape()
-    
-    # scrape each city/category
-    for url in landing_urls:
-        scrape_city_category(landing_page=url, get_imgs=get_imgs)
+    # for each landing page (i.e.: Baton Rouge WomenSeekMen)
+    for line in city_category:
+
+        # create url to go to ads
+        base_url = "http://" + line[0] + ".backpage.com/" + line[1] + "/"
+
+        # go through all pages to get links to for all ads for that city/cateory
+        ad_urls = get_urls(base_url)
+
+        # go to each ad and store content
+        for i, url in enumerate(ad_urls):
+
+            # store HTML data in dict
+            ad = store_html_in_dict(url)
+
+            # if you want to collect images...
+            if get_imgs is True:
+
+                # store images in local directory
+                ad_imgs = fetch_imgs(url, i, img_path)
+
+                # add image paths to ad data
+                ad['img_paths'] = ad_imgs
+
+                # count the number of images and add to ad data
+                ad['num_imgs'] = len(ad_imgs)
+
+             # insert ad data into table
+            cur.execute("INSERT INTO backpage_raw (ad) VALUES (%s)", [json.dumps(ad)])
+
+            # sleep for a hot second...
+            sleep(random())
+
+        logger.info("Number of ads collected in {} - {}: {}".format(line[0], line[1], i + 1))
 
 
-# In[ ]:
-
-
-
-
-# In[ ]:
-
-
-
-
-# # Main Code Body
-
-# In[14]:
-
-scrape_all(get_imgs=False)
-
-
-# In[ ]:
-
-
-
-
-# In[ ]:
-
-
-
+if __name__ == "__main__":
+    cli()

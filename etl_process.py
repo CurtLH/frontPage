@@ -1,10 +1,6 @@
+#!/usr/bin/env python
 
-# coding: utf-8
-
-# # Customize Enviornment
-
-# In[1]:
-
+import click
 import logging
 import os
 from datetime import datetime
@@ -17,10 +13,7 @@ import psycopg2
 import json
 from random import random
 from time import sleep
-from pprint import pprint
 
-
-# In[2]:
 
 # enable logging
 logging.basicConfig(level=logging.INFO,
@@ -30,14 +23,7 @@ logger = logging.getLogger()
 logger.setLevel(logging.INFO)
 
 
-# In[ ]:
-
-
-
-
-# # Define Functions to Extract Fields
-
-# In[24]:
+##### HELPER FUNCTIONS #####
 
 def get_ad_date(soup):
     
@@ -52,8 +38,6 @@ def get_ad_date(soup):
         return ""
 
 
-# In[25]:
-
 def get_ad_id(line):
     
     try:
@@ -64,8 +48,6 @@ def get_ad_id(line):
     except:
         return ""
 
-
-# In[26]:
 
 def get_category(line):
     
@@ -78,8 +60,6 @@ def get_category(line):
         return ""
 
 
-# In[27]:
-
 def get_city(line):
     
     try:
@@ -91,8 +71,6 @@ def get_city(line):
         return ""
 
 
-# In[28]:
-
 def get_other_ads(soup):
     
     try:
@@ -103,8 +81,6 @@ def get_other_ads(soup):
     except:
         return ""
 
-
-# In[29]:
 
 def phone_extract(post):
 
@@ -156,8 +132,6 @@ def phone_extract(post):
     return phone_del
 
 
-# In[30]:
-
 def get_phone_number(soup):
     
     try:
@@ -170,8 +144,6 @@ def get_phone_number(soup):
         ""
 
 
-# In[31]:
-
 def get_locations(soup):
     
     try:
@@ -183,8 +155,6 @@ def get_locations(soup):
         return ""
 
 
-# In[11]:
-
 def get_image_paths(line):
     
     try:
@@ -194,8 +164,6 @@ def get_image_paths(line):
         return ""
 
 
-# In[12]:
-
 def get_num_images(line):
     
     try:
@@ -204,8 +172,6 @@ def get_num_images(line):
     except:
         return ""
 
-
-# In[13]:
 
 def get_post_body(soup):
     
@@ -218,8 +184,6 @@ def get_post_body(soup):
         return ""
 
 
-# In[14]:
-
 def get_poster_age(soup):
     
     try:
@@ -231,8 +195,6 @@ def get_poster_age(soup):
         return ""
 
 
-# In[15]:
-
 def get_post_title(soup):
     
     try:
@@ -243,8 +205,6 @@ def get_post_title(soup):
     except:
         return ""
 
-
-# In[16]:
 
 def clean_data(line):
     
@@ -279,15 +239,9 @@ def clean_data(line):
         pass
 
 
-# In[ ]:
+##### MAIN PROGRAM #####
 
-
-
-
-# # Run Cleaning Process and Insert Clean Data
-
-# In[34]:
-
+@click.command()
 def cli():
 
     """ETL process for Backpage data"""
@@ -342,7 +296,10 @@ def cli():
 
         # insert into database
         try:
-            cur.execute("INSERT INTO backpage (ad_date, ad_id, category, city, image_paths, locations, num_images, other_ads, phone, post_body, post_title, poster_age, scrape_date, url) VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)", [clean_line[item] for item in sorted(clean_line.keys())])
+            cur.execute("""INSERT INTO backpage 
+                           (ad_date, ad_id, category, city, image_paths, locations, num_images, 
+                            other_ads, phone, post_body, post_title, poster_age, scrape_date, url) 
+                           VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)""", [clean_line[item] for item in sorted(clean_line.keys())])
 
         except:
            #logger.warning("Cannot load record into backpage")
@@ -352,12 +309,6 @@ def cli():
     logger.info("Successfully loaded records in backpage")
 
 
-# In[35]:
-
-cli()
-
-
-# In[ ]:
-
-
+if __name__ == "__main__":
+    cli()
 
