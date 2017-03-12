@@ -1,5 +1,7 @@
 #!/usr/bin/env python
 
+import socket
+import socks
 import click
 import logging
 import os
@@ -21,6 +23,17 @@ logging.basicConfig(level=logging.INFO,
                     datefmt="%Y-%m-%d %H:%M:%S")
 logger = logging.getLogger()
 logger.setLevel(logging.INFO)
+
+# enable TOR browsing
+socks.setdefaultproxy(socks.PROXY_TYPE_SOCKS5, '127.0.0.1', 9050)
+socket.socket = socks.socksocket
+
+# check IP address
+def getaddrinfo(*args):
+  return [(socket.AF_INET, socket.SOCK_STREAM, 6, '', (args[0], args[1]))]
+socket.getaddrinfo = getaddrinfo
+r = urllib.urlopen('http://my-ip.herokuapp.com').read()
+logger.info("TOR enabled: {}".format(r.split('"')[3]))
 
 
 ##### HELPER FUNCTIONS ##### 
