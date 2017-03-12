@@ -212,7 +212,7 @@ def clean_data(line):
     if line['code'] == 200:
     
         #  load object into Beautiful Soup
-        soup = bs(line['read'], "lxml")
+        soup = bs(line['read'], "html.parser")
 
         # extract relevant fields
         row = {'ad_date' : get_ad_date(soup),

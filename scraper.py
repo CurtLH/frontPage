@@ -61,7 +61,7 @@ def get_urls(landing_page):
     
         # open the URL
         url = landing_page + "?page=" + str(page_num)
-        soup = bs(urllib2.urlopen(url), "lxml")
+        soup = bs(urllib2.urlopen(url), "html.parser")
         
         # look for the links
         if "No matches found." not in soup.get_text():
@@ -95,7 +95,7 @@ def fetch_imgs(url, i, img_path):
     img_num = 0
     
     # load URL as bs objects
-    soup = bs(urllib2.urlopen(url), "lxml")
+    soup = bs(urllib2.urlopen(url), "html.parser")
     
     # get all images and their links
     images = [img for img in soup.findAll('img')]
@@ -167,7 +167,7 @@ def cli(get_imgs, category_file, city_file):
 
     # if you want to get images, create directory to store images
     if get_imgs is True:
-        path = "/home/curtis/Github/frontPage"
+        path = "/home/elmer/frontPage"
         img_path = create_output_dir(path)
 
     # load cities and categories to scrape
