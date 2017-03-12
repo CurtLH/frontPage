@@ -15,6 +15,7 @@ import psycopg2
 import json
 from random import random
 from time import sleep
+import etl_process as etl
 
 
 # enable logging
@@ -142,6 +143,23 @@ def store_html_in_dict(url):
     return data
 
 
+def create_uniq_id(data):
+
+    #  load object into Beautiful Soup
+    soup = bs(data['read'], "html.parser")
+
+    # parse fields to create unique id
+    ad_id = etl.get_ad_id(data)    
+    city = etl.get_city(data)
+    category = etl.get_category(data)
+    post_date = etl.get_ad_date(soup)
+
+    # combine fields into unique id
+    uniq_id = post_date + "-" + ad_id + "-" + city + "-" + category
+
+    return uniq_id
+
+
 ##### MAIN PROGRAM #####
 
 
@@ -167,16 +185,17 @@ def cli(get_imgs, category_file, city_file):
         # define the cursor to be able to write to the database
         cur = conn.cursor()
 
-        # create the table if it doesn't exist
-        cur.execute("""CREATE TABLE IF NOT EXISTS backpage_raw 
-                       (id SERIAL PRIMARY KEY NOT NULL, 
-                       ad JSONB)""")
-
         logging.info("Successfully connected to the database")
 
     except:
         logging.info("Unable to connect to the database")
 
+
+    # create the table if it doesn't exist
+    cur.execute("""CREATE TABLE IF NOT EXISTS backpage_raw 
+                   (id SERIAL PRIMARY KEY NOT NULL, 
+                    uniq_id VARCHAR UNIQUE NOT NULL, 
+                    ad JSONB)""")
 
     # if you want to get images, create directory to store images
     if get_imgs is True:
@@ -208,6 +227,10 @@ def cli(get_imgs, category_file, city_file):
             # store HTML data in dict
             ad = store_html_in_dict(url)
 
+            # create unique_id for ad
+            uniq_id = create_uniq_id(ad)
+            ad['uniq_id'] = uniq_id
+
             # if you want to collect images...
             if get_imgs is True:
 
@@ -220,8 +243,14 @@ def cli(get_imgs, category_file, city_file):
                 # count the number of images and add to ad data
                 ad['num_imgs'] = len(ad_imgs)
 
-             # insert ad data into table
-            cur.execute("INSERT INTO backpage_raw (ad) VALUES (%s)", [json.dumps(ad)])
+            try:
+                # insert ad data into table
+                cur.execute("INSERT INTO backpage_raw (uniq_id, ad) VALUES (%s, %s)", [uniq_id, json.dumps(ad)])
+                #logger.info("INSERTED {}".format(uniq_id))
+            
+            except:
+                logger.info("DID NOT INSERT: {}".format(uniq_id))
+                pass
 
             # sleep for a hot second...
             sleep(random())

@@ -228,6 +228,7 @@ def clean_data(line):
                'poster_age' : get_poster_age(soup),
                'post_title' : get_post_title(soup), 
                'scrape_date' : str(line['scrape_date']),
+               'uniq_id' : str(line['uniq_id']),
                'url' : str(line['url'])
               }
         
@@ -276,6 +277,7 @@ def cli():
                    post_title VARCHAR,
                    poster_age VARCHAR,
                    scrape_date TIMESTAMP,
+                   uniq_id VARCHAR UNIQUE NOT NULL,
                    url VARCHAR);""")
     
     # query the database and store the results
@@ -298,8 +300,8 @@ def cli():
         try:
             cur.execute("""INSERT INTO backpage 
                            (ad_date, ad_id, category, city, image_paths, locations, num_images, 
-                            other_ads, phone, post_body, post_title, poster_age, scrape_date, url) 
-                           VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)""", [clean_line[item] for item in sorted(clean_line.keys())])
+                            other_ads, phone, post_body, post_title, poster_age, scrape_date, uniq_id, url) 
+                           VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)""", [clean_line[item] for item in sorted(clean_line.keys())])
 
         except:
            #logger.warning("Cannot load record into backpage")
