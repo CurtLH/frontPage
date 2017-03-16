@@ -141,7 +141,7 @@ def get_phone_number(soup):
         return phone
     
     except:
-        ""
+        return ""
 
 
 def get_locations(soup):
@@ -243,7 +243,9 @@ def clean_data(line):
 ##### MAIN PROGRAM #####
 
 @click.command()
-def cli():
+@click.option('--batch_size', type=int, default=50, help='number of ads to load at a time (default=50)')
+@click.option('--sleep_time', type=int, default=600, help='number of seconds to wait before checking for new data to load (default=600)')
+def cli(batch_size, sleep_time):
 
     """ETL process for Backpage data"""
 
@@ -259,7 +261,7 @@ def cli():
 
     except:
         logger.warning("Cannot connect to database")
-
+        exit
     
     # create table if it doesn't exists 
     cur.execute("""CREATE TABLE IF NOT EXISTS backpage ( 
@@ -279,37 +281,55 @@ def cli():
                    scrape_date TIMESTAMP,
                    uniq_id VARCHAR UNIQUE NOT NULL,
                    url VARCHAR);""")
-    
-    # query the database and store the results
-    try:
-        cur.execute("""SELECT ad FROM backpage_raw""") 
+
+    # create a set of uniq_ids that cannot be loaded
+    cannot_load = set()
+
+    while True:
+   
+        # get the first 50 records that haven't been loaded
+        cur.execute("""SELECT ad
+                       FROM backpage_raw
+                       WHERE uniq_id NOT IN (SELECT uniq_id
+                                             FROM backpage)
+                       LIMIT 50;""")
+
+
+        # load the records into a list
         data = [record[0] for record in cur]
-        logger.info("Loaded %s records from backpage_raw", len(data)) 
 
-    except:
-        logger.warning("Unable to query backpage")
+        # remove records that have been identifed as not able to load
+        data = [line for line in data if line['uniq_id'] not in cannot_load]
+                                                   
+        # if there is something to load...
+        if len(data) > 0:
+           
+            # transformed and load ads into the database
+            for line in data:
+
+                # run cleaning process
+                clean_line = clean_data(line)
+
+                # insert into database
+                try:
+                    cur.execute("""INSERT INTO backpage 
+                                   (ad_date, ad_id, category, city, image_paths, locations, num_images, 
+                                    other_ads, phone, post_body, post_title, poster_age, scrape_date, uniq_id, url) 
+                                   VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)""", [clean_line[item] for item in sorted(clean_line.keys())])
+
+                except:
+                    #logger.warning("Cannot load record into backpage")
+                    cannot_load.add(clean_line['uniq_id'])
+                    pass
 
 
-    # load transformed ads into the database
-    for line in data:
+            logger.info("Successfully loaded another chunk in backpage")
 
-        # run cleaning process
-        clean_line = clean_data(line)
-
-        # insert into database
-        try:
-            cur.execute("""INSERT INTO backpage 
-                           (ad_date, ad_id, category, city, image_paths, locations, num_images, 
-                            other_ads, phone, post_body, post_title, poster_age, scrape_date, uniq_id, url) 
-                           VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)""", [clean_line[item] for item in sorted(clean_line.keys())])
-
-        except:
-           #logger.warning("Cannot load record into backpage")
-            pass
-
-
-    logger.info("Successfully loaded records in backpage")
-
+        else:
+   
+            # wait and see if there is something else to load
+            logging.info("Waiting for new records...sleeping for {} seconds".format(sleep_time))
+            sleep(sleep_time)
 
 if __name__ == "__main__":
     cli()
