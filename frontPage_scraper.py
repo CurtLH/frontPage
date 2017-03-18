@@ -1,3 +1,5 @@
+#!/usr/bin/env python
+
 import socket
 import socks
 import click
@@ -13,7 +15,7 @@ import psycopg2
 import json
 from random import random
 from time import sleep
-import etl_process as etl
+import frontPage_etl as etl
 
 
 # enable logging
