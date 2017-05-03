@@ -2,6 +2,7 @@
 
 import click
 import logging
+import csv
 import os
 from datetime import datetime
 from bs4 import BeautifulSoup as bs
@@ -25,23 +26,23 @@ logger.setLevel(logging.INFO)
 
 ##### HELPER FUNCTIONS #####
 
-def get_ad_date(soup):
+def get_post_date(soup):
     
     try:
         ad_date = soup.find("div",{"class":"adInfo"}).getText().encode('ascii','ignore')
         ad_date = ad_date.replace("\r", "").replace("\n", "").replace("Posted:", "").strip()
         ad_date = datetime.strptime(ad_date, "%A, %B %d, %Y %I:%M %p")
         ad_date = ad_date.strftime("%Y-%m-%d %H:%M:%S")
+ 
         return ad_date
         
     except:
         return ""
 
 
-def get_ad_id(line):
+def get_ad_id(url):
     
     try:
-        url = line['url']
         ad_id = url.split('/')[5]
         return ad_id
         
@@ -49,10 +50,9 @@ def get_ad_id(line):
         return ""
 
 
-def get_category(line):
+def get_category(url):
     
     try:
-        url = line['url']
         category = url.split('/')[3]
         return category
         
@@ -60,15 +60,10 @@ def get_category(line):
         return ""
 
 
-def get_city(line):
-    
-    try:
-        url = line['url']
-        city = url.split('/')[2].split('.')[0]
-        return city
-        
-    except:
-        return ""
+def get_site_id(url):
+
+    site_id = url.split('/')[2].split('.')[0]
+    return site_id
 
 
 def get_other_ads(soup):
@@ -155,24 +150,6 @@ def get_locations(soup):
         return ""
 
 
-def get_image_paths(line):
-    
-    try:
-        return line['img_paths']
-        
-    except:
-        return ""
-
-
-def get_num_images(line):
-    
-    try:
-        return line['num_imgs']
-        
-    except:
-        return ""
-
-
 def get_post_body(soup):
     
     try:
@@ -206,38 +183,46 @@ def get_post_title(soup):
         return ""
 
 
+def load_city_state_as_dict(filename):
+
+    # load the CSV of cities and states
+    with open(filename, 'r') as f:
+        data = list(csv.reader(f))
+
+    # convert to a dict
+    site_map = {}
+    for line in data[1:]:
+        site_map[line[0]] = {'city' : line[1],
+                             'state' : line[2],
+                             'region' : line[3],
+                             'division' : line[4],
+                             'url' : line[5]}
+
+    return site_map
+
+
 def clean_data(line):
-    
-    # if the response was successful
-    if line['code'] == 200:
-    
-        #  load object into Beautiful Soup
-        soup = bs(line['read'], "html.parser")
 
-        # extract relevant fields
-        row = {'ad_date' : get_ad_date(soup),
-               'ad_id' : str(get_ad_id(line)),
-               'category' : str(get_category(line)),
-               'city' : str(get_city(line)),
-               'image_paths' : str(get_image_paths(line)),
-               'locations' : get_locations(soup),
-               'num_images' : str(get_num_images(line)),
-               'other_ads' : get_other_ads(soup),
-               'phone' : get_phone_number(soup),
-               'post_body' : get_post_body(soup),
-               'poster_age' : get_poster_age(soup),
-               'post_title' : get_post_title(soup), 
-               'scrape_date' : str(line['scrape_date']),
-               'uniq_id' : str(line['uniq_id']),
-               'url' : str(line['url'])
-              }
-        
-        return row
+    # load object into Beautiful Soup
+    soup = bs(line['read'], "html.parser")
 
-    else:
+    # extract relevant fields
+    row = {'ad_id'       : get_ad_id(line['url']),
+           'ad_url'      : line['url'],
+           'category'    : get_category(line['url']),
+           'locations'   : get_locations(soup),
+           'other_ads'   : get_other_ads(soup),
+           'phone'       : get_phone_number(soup),
+           'post_body'   : get_post_body(soup),
+           'post_date'   : get_post_date(soup),
+           'poster_age'  : get_poster_age(soup),
+           'post_title'  : get_post_title(soup), 
+           'scrape_date' : line['scrape_date'],
+           'site_id'     : get_site_id(line['url']),
+           'uniq_id'     : line['uniq_id']
+          }
         
-        logger.info("Issue in cleaning data")
-        pass
+    return row
 
 
 def conform_dbs(cur):
@@ -266,6 +251,9 @@ def cli(batch_size, sleep_time):
 
     """ETL process for Backpage data"""
 
+    # load CSV file with cities and states
+    site_map = load_city_state_as_dict('./URLs.csv')
+
     # connect to the database
     try:
         conn = psycopg2.connect(database="postgres",
@@ -282,22 +270,24 @@ def cli(batch_size, sleep_time):
     
     # create table if it doesn't exists 
     cur.execute("""CREATE TABLE IF NOT EXISTS backpage ( 
-                   id SERIAL PRIMARY KEY NOT NULL,
-                   ad_date TIMESTAMP,
+                   id SERIAL PRIMARY KEY NOT NULL, 
                    ad_id VARCHAR,
+                   ad_url VARCHAR,
                    category VARCHAR,
                    city VARCHAR,
-                   image_paths VARCHAR,
+                   division VARCHAR,
                    locations VARCHAR,
-                   num_images VARCHAR,
                    other_ads VARCHAR,
                    phone VARCHAR,
                    post_body VARCHAR,
+                   post_date TIMESTAMP,
                    post_title VARCHAR,
                    poster_age VARCHAR,
+                   region VARCHAR,
                    scrape_date TIMESTAMP,
-                   uniq_id VARCHAR UNIQUE NOT NULL,
-                   url VARCHAR);""")
+                   site_id VARCHAR,
+                   state VARCHAR,
+                   uniq_id VARCHAR UNIQUE NOT NULL);""")
 
     # create a set of uniq_ids that cannot be loaded
     cannot_load = set()
@@ -327,15 +317,21 @@ def cli(batch_size, sleep_time):
                 # run cleaning process
                 clean_line = clean_data(line)
 
+                # add in infomation from site map (city, state, region, division)
+                clean_line['city'] = site_map[clean_line['site_id']]['city']
+                clean_line['state'] = site_map[clean_line['site_id']]['state']
+                clean_line['region'] = site_map[clean_line['site_id']]['region']
+                clean_line['division'] = site_map[clean_line['site_id']]['division']
+
                 # insert into database
                 try:
-                    cur.execute("""INSERT INTO backpage 
-                                   (ad_date, ad_id, category, city, image_paths, locations, num_images, 
-                                    other_ads, phone, post_body, post_title, poster_age, scrape_date, uniq_id, url) 
-                                   VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)""", [clean_line[item] for item in sorted(clean_line.keys())])
+                    cur.execute("""INSERT INTO backpage
+                                   (ad_id, ad_url, category, city, division, locations, other_ads, phone, post_body, post_date, post_title, poster_age, region, scrape_date, site_id, state, uniq_id) 
+                                   VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)""", [clean_line[item] for item in sorted(clean_line.keys())])
+                    logger.info("New record inserted")
 
                 except:
-                    #logger.warning("Cannot load record into backpage")
+                    logger.warning("Cannot load record into backpage")
                     cannot_load.add(clean_line['uniq_id'])
                     pass
 
