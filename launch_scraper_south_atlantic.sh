@@ -2,5 +2,5 @@
 
 cd /home/elmer/frontPage
 
-python frontPage_scraper.py --city_file South_Atlantic.txt
+python scraper.py --city_file South_Atlantic.txt
 

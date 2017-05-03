@@ -12,7 +12,7 @@ import psycopg2
 import json
 from random import random
 from time import sleep
-import frontPage_etl as etl
+import etl_process as etl
 
 
 # enable logging
