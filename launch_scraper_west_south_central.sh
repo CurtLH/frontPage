@@ -2,5 +2,5 @@
 
 cd /home/elmer/frontPage
 
-python scraper.py --city_file West_South_Central.txt
+python scraper.py --city_file cities_west_south_central.txt
 

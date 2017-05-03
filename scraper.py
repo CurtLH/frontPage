@@ -13,7 +13,7 @@ import json
 from random import random
 from time import sleep
 import etl_process as etl
-
+from functools import wraps
 
 # enable logging
 logging.basicConfig(level=logging.INFO,
@@ -98,39 +98,54 @@ def get_urls(landing_page, sleep_time):
 
     return urls
 
+def retry(ExceptionToCheck, tries=4, delay=3, backoff=2):
 
-def store_html_in_dict(url, sleep_time):
+    """http://www.saltycrane.com/blog/2009/11/trying-out-retry-decorator-python/"""
 
-    # start the attempt counter
-    attempt = 1
+    def deco_retry(f):
 
-    # if less than 6 attempts have been made
-    while attempt < 6:
+        @wraps(f)
+        def f_retry(*args, **kwargs):
 
-        # fetch the url
-        response = urllib2.urlopen(url)
+            mtries, mdelay = tries, delay
 
-        # if the response code is valid
-        if response.code == 200:
+            while mtries > 1:
 
-            # bundle the response object with other response attributes
-            data = {'scrape_date': datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
-                    'code': response.code,
-                    'url': response.url,
-                    'read': response.read()}
+                try:
+                    return f(*args, **kwargs)
 
-            return data
+                except ExceptionToCheck, e:
+                    logger.info("%s, Retrying in %d seconds..." % (str(e), mdelay))
 
-        # if the response is not valid
-        else:
+                    time.sleep(mdelay)
+                    mtries -= 1
+                    mdelay *= backoff
 
-            # log warning, advance attempt counter, and sleep for 100 seconds
-            logger.info("Unable to retreive {} on attempt #{}.  Waiting 100 seconds and will try again.".format(url, attempt))
-            attempt += 1
-            sleep(sleep_time)
-            enable_tor()
+            return f(*args, **kwargs)
 
-            return False
+        return f_retry  # true decorator
+
+    return deco_retry
+
+
+@retry(urllib2.URLError, tries=4, delay=3, backoff=2)
+def urlopen_with_retry(url):
+
+    # open URL and return the response item
+    response = urllib2.urlopen(url)
+
+    return response
+
+
+def store_html_in_dict(response):
+
+    # bundle the response object with other response attributes
+    data = {'scrape_date': datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
+            'code': response.code,
+            'url': response.url,
+            'read': response.read()}
+
+    return data
 
 
 def create_uniq_id(data):
@@ -155,7 +170,7 @@ def create_uniq_id(data):
 @click.option('--sleep_time', type=int, default=60, help='Number of seconds to sleep if there is a error getting the URLs (default=60)')
 @click.option('--category_file', default='./default_categories.txt', help='File for TXT file of categories to scrape (default: ./default_categories.txt')
 @click.option('--city_file', default='./default_cities.txt', help='File for TXT file of cities to scrape (default: ./default_cities.txt')
-def cli(get_imgs, category_file, city_file):
+def cli(sleep_time, category_file, city_file):
 
     """Web scraper for collecting ad information"""
 
@@ -208,8 +223,11 @@ def cli(get_imgs, category_file, city_file):
         # go to each ad and store content
         for url in ad_urls:
 
+            # query URL  
+            response = urlopen_with_retry(url)
+
             # try each url and store HTML data in dict
-            ad = store_html_in_dict(url, sleep_time)
+            ad = store_html_in_dict(response)
 
             # if the results did not come back
             if ad is not False:
@@ -230,11 +248,8 @@ def cli(get_imgs, category_file, city_file):
 
                 # if it's not successful, log the event and move on
                 except:
-                    logger.info("Record already exists in the database: {}".format(uniq_id))
+                    #logger.info("Record already exists in the database: {}".format(uniq_id))
                     pass
-
-            else:
-                pass
 
 if __name__ == "__main__":
     cli()
