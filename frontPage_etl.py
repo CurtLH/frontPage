@@ -240,6 +240,23 @@ def clean_data(line):
         pass
 
 
+def conform_dbs(cur):
+
+    # delete records that were posted before we collected the first ad
+    cur.execute("""DELETE                        
+                   FROM backpage
+                   WHERE uniq_id IN (SELECT uniq_id 
+                                     FROM backpage 
+                                     WHERE ad_date < (SELECT MIN(scrape_date) 
+                                     FROM backpage));""")
+
+    # delete reocrds that are in the clean data but not the raw data
+    cur.execute("""DELETE 
+                   FROM backpage
+                   WHERE uniq_id NOT IN (SELECT uniq_id 
+                                         FROM backpage_raw);""")
+
+
 ##### MAIN PROGRAM #####
 
 @click.command()
@@ -327,6 +344,9 @@ def cli(batch_size, sleep_time):
 
         else:
    
+            # conform databases and make sure the same records are in both
+            conform_dbs(cur)
+
             # wait and see if there is something else to load
             logging.info("Waiting for new records...sleeping for {} seconds".format(sleep_time))
             sleep(sleep_time)

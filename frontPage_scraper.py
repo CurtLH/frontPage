@@ -271,12 +271,14 @@ def cli(sleep_time, get_imgs, category_file, city_file):
                 
                     # insert ad data into table
                     cur.execute("INSERT INTO backpage_raw (uniq_id, ad) VALUES (%s, %s)", [uniq_id, json.dumps(ad)])
+                    logger.info("New record inserted: {}".format(uniq_id))
             
                 except:
                     pass
 
             except:
                 logger.info("Skipped: {}".format(url))
+                sleep(random() * 60.0)
                 enable_tor()
                 pass
 
