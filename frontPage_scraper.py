@@ -101,7 +101,7 @@ def get_urls(landing_page, sleep_time):
                 urls.append(element.a["href"])
                 
             # log event
-            #logger.info("Success: {}".format(url))
+            logger.info("Success: {}".format(url))
 
             # increment page number by 1
             page_num += 1
@@ -111,7 +111,7 @@ def get_urls(landing_page, sleep_time):
         
         # if no links are found, stop
         else:
-            #logger.info("No more pages available")
+            logger.info("No more pages available")
             break
             
     logger.info("Number of ads in {} - {}: {}".format(city, category, len(urls)))
@@ -148,15 +148,37 @@ def fetch_imgs(url, i, img_path):
 
 
 def store_html_in_dict(url):
+
+    # start the attempt counter
+    attempt = 1
+
+    # if less than 6 attempts have been made
+    while attempt < 6:
+
+        # fetch the url
+        response = urllib2.urlopen(url)
+
+        # if the response code is valid
+        if response.code == 200:
     
-    response = urllib2.urlopen(url)
-    
-    data = {'scrape_date' : datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
-            'code' : response.code,
-            'url'  : response.url,
-            'read' : response.read()}
-    
-    return data
+            # bundle the response object with other response attributes
+            data = {'scrape_date' : datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
+                    'code' : response.code,
+                    'url'  : response.url,
+                    'read' : response.read()}
+
+            return data
+
+        # if the response is not valid
+        else:
+ 
+            # print warning, advance attempt counter, and sleep for 60 seconds
+            logger.info("Unable to retreive {} on attempt #{}.  Waiting 60 seconds and will try again.".format(url, attempt))
+            attempt += 1
+            sleep(60)
+            enable_tor()
+
+            return False
 
 
 def create_uniq_id(data):
@@ -178,7 +200,6 @@ def create_uniq_id(data):
 
 ##### MAIN PROGRAM #####
 
-
 @click.command()
 @click.option('--sleep_time', type=int, default=23, help = 'Number of seconds to sleep if there is a error getting the URLs (default=23)')
 @click.option('--get_imgs/--no_imgs', default = False, help = 'Options to download all images from the ads (default: no_imgs)')
@@ -190,7 +211,6 @@ def cli(sleep_time, get_imgs, category_file, city_file):
 
     # use TOR to mask ip address
     enable_tor()
-
 
     try:
 
@@ -245,11 +265,15 @@ def cli(sleep_time, get_imgs, category_file, city_file):
         # go to each ad and store content
         for i, url in enumerate(ad_urls):
 
-            # try each url, if you doesn't work, skip it
-            try:
-            
-                # store HTML data in dict
-                ad = store_html_in_dict(url)
+            # try each url and store HTML data in dict
+            ad = store_html_in_dict(url)
+
+            # if the results did not come back
+            if ad == False:
+                pass
+                
+            # otherwise load the results
+            else:
 
                 # create unique_id for ad
                 uniq_id = create_uniq_id(ad)
@@ -268,25 +292,14 @@ def cli(sleep_time, get_imgs, category_file, city_file):
                     ad['num_imgs'] = len(ad_imgs)
 
                 try:
-                
+               
                     # insert ad data into table
                     cur.execute("INSERT INTO backpage_raw (uniq_id, ad) VALUES (%s, %s)", [uniq_id, json.dumps(ad)])
                     logger.info("New record inserted: {}".format(uniq_id))
             
                 except:
+                    #logger.info("Record already exists in the database: {}".format(uniq_id))
                     pass
-
-            except:
-                logger.info("Skipped: {}".format(url))
-                sleep(random() * 60.0)
-                enable_tor()
-                pass
-
-            # sleep for a hot second...
-            sleep(random())
-
-        logger.info("Number of ads collected in {} - {}: {}".format(line[0], line[1], i + 1))
-
 
 if __name__ == "__main__":
     cli()
