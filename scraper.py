@@ -14,6 +14,7 @@ from random import random
 from time import sleep
 import etl_process as etl
 from functools import wraps
+import time
 
 # enable logging
 logging.basicConfig(level=logging.INFO,
@@ -98,7 +99,7 @@ def get_urls(landing_page, sleep_time):
 
     return urls
 
-def retry(ExceptionToCheck, tries=4, delay=3, backoff=2):
+def retry(ExceptionToCheck, tries=4, delay=30, backoff=2):
 
     """http://www.saltycrane.com/blog/2009/11/trying-out-retry-decorator-python/"""
 
@@ -128,7 +129,7 @@ def retry(ExceptionToCheck, tries=4, delay=3, backoff=2):
     return deco_retry
 
 
-@retry(urllib2.URLError, tries=4, delay=3, backoff=2)
+@retry(urllib2.URLError, tries=4, delay=30, backoff=2)
 def urlopen_with_retry(url):
 
     # open URL and return the response item
@@ -154,13 +155,13 @@ def create_uniq_id(data):
     soup = bs(data['read'], "html.parser")
 
     # parse fields to create unique id
-    ad_id = etl.get_ad_id(data)
-    city = etl.get_city(data)
-    category = etl.get_category(data)
-    post_date = etl.get_ad_date(soup)
+    ad_id = etl.get_ad_id(data['url'])
+    site_id = etl.get_site_id(data['url'])
+    category = etl.get_category(data['url'])
+    post_date = etl.get_post_date(soup)
 
     # combine fields into unique id
-    uniq_id = post_date + "-" + ad_id + "-" + city + "-" + category
+    uniq_id = post_date + "-" + ad_id + "-" + site_id + "-" + category
 
     return uniq_id
 

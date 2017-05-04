@@ -2,5 +2,5 @@
 
 cd /home/elmer/frontPage
 
-python frontPage_etl.py
+python etl_process.py
 

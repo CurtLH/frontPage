@@ -232,7 +232,7 @@ def conform_dbs(cur):
                    FROM backpage
                    WHERE uniq_id IN (SELECT uniq_id 
                                      FROM backpage 
-                                     WHERE ad_date < (SELECT MIN(scrape_date) 
+                                     WHERE post_date < (SELECT MIN(scrape_date) 
                                      FROM backpage));""")
 
     # delete reocrds that are in the clean data but not the raw data
@@ -328,7 +328,7 @@ def cli(batch_size, sleep_time):
                     cur.execute("""INSERT INTO backpage
                                    (ad_id, ad_url, category, city, division, locations, other_ads, phone, post_body, post_date, post_title, poster_age, region, scrape_date, site_id, state, uniq_id) 
                                    VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)""", [clean_line[item] for item in sorted(clean_line.keys())])
-                    logger.info("New record inserted")
+                    #logger.info("New record inserted")
 
                 except:
                     logger.warning("Cannot load record into backpage")
