@@ -13,8 +13,6 @@ import json
 from random import random
 from time import sleep
 import etl_process as etl
-from functools import wraps
-import time
 
 # enable logging
 logging.basicConfig(level=logging.INFO,
@@ -51,86 +49,45 @@ def get_urls(landing_page, sleep_time):
     # create a list to hold the URLS
     urls = []
 
-    # start at page #1
-    page_num = 1
-
     # go through each page and find the links to all the ads
-    while True:
+    for page_num in range(1, 50):
 
         # create the URL
         url = landing_page + "?page=" + str(page_num)
 
         # try to open the URL
-        while True:
-            try:
-                soup = bs(urllib2.urlopen(url), "html.parser")
+        try:
+            soup = bs(urllib2.urlopen(url), "html.parser")
+   
+            # look for the links
+            if "No matches found." not in soup.get_text():
+
+                # find all the links to the other ads
+                for element in soup.findAll("div", {"class": re.compile("cat*")}):
+                    urls.append(element.a["href"])
+
+                # log event
+                logger.info("Success: {}".format(url))
+
+                # increment page number by 1
+                page_num += 1
+
+            elif "No matches found." in soup.get_text():
                 break
 
-            # if it doesn't open, take a break, refresh IP, and try again
-            except:
-                logger.info("Unable to get URLs for {} - {}".format(city, category))
-                logger.info("Sleeping for {} seconds before trying again".format(sleep_time))
-                sleep(sleep_time)
-                enable_tor()
-
-        # look for the links
-        if "No matches found." not in soup.get_text():
-
-            # find all the links to the other ads
-            for element in soup.findAll("div", {"class": re.compile("cat*")}):
-                urls.append(element.a["href"])
-
-            # log event
-            logger.info("Success: {}".format(url))
-
-            # increment page number by 1
-            page_num += 1
-
-            # wait for a random amount of time
-            sleep(random() * 2)
-
-        # if no links are found, stop
-        else:
-            logger.info("No more pages available")
-            break
+        # if it doesn't open, take a break, refresh IP, and try again
+        except urllib2.HTTPError as err:
+            logger.info("HTTP Error:{}".format(url))
+            logger.info(err)
+            pass
 
     # log total number of URLs from each city/category
     logger.info("Number of ads in {} - {}: {}".format(city, category, len(urls)))
 
     return urls
 
-def retry(ExceptionToCheck, tries=4, delay=30, backoff=2):
 
-    """http://www.saltycrane.com/blog/2009/11/trying-out-retry-decorator-python/"""
-
-    def deco_retry(f):
-
-        @wraps(f)
-        def f_retry(*args, **kwargs):
-
-            mtries, mdelay = tries, delay
-
-            while mtries > 1:
-
-                try:
-                    return f(*args, **kwargs)
-
-                except ExceptionToCheck, e:
-                    logger.info("%s, Retrying in %d seconds..." % (str(e), mdelay))
-
-                    time.sleep(mdelay)
-                    mtries -= 1
-                    mdelay *= backoff
-
-            return f(*args, **kwargs)
-
-        return f_retry  # true decorator
-
-    return deco_retry
-
-
-@retry(urllib2.URLError, tries=4, delay=30, backoff=2)
-def urlopen_with_retry(url):
+def open_url(url):
 
     # open URL and return the response item
     response = urllib2.urlopen(url)
@@ -224,33 +181,39 @@ def cli(sleep_time, category_file, city_file):
         # go to each ad and store content
         for url in ad_urls:
 
-            # query URL  
-            response = urlopen_with_retry(url)
+            # try to open the URL
+            try:
 
-            # try each url and store HTML data in dict
-            ad = store_html_in_dict(response)
+                # query URL  
+                response = open_url(url)
 
-            # if the results did not come back
-            if ad is not False:
+                # try each url and store HTML data in dict
+                ad = store_html_in_dict(response)
 
-                # create unique_id for ad
-                uniq_id = create_uniq_id(ad)
+                # if the results did not come back
+                if ad is not False:
 
-                # add the unique id to the dict
-                ad['uniq_id'] = uniq_id
+                    # create unique_id for ad
+                    uniq_id = create_uniq_id(ad)
 
-                # convert the dict to JSON object
-                ad_json = json.dumps(ad)
+                    # add the unique id to the dict
+                    ad['uniq_id'] = uniq_id
 
-                # try to insert the JSON object
-                try:
-                    cur.execute("INSERT INTO backpage_raw (uniq_id, ad) VALUES (%s, %s)", [uniq_id, ad_json])
-                    logger.info("New record inserted: {}".format(uniq_id))
+                    # convert the dict to JSON object
+                    ad_json = json.dumps(ad)
 
-                # if it's not successful, log the event and move on
-                except:
-                    #logger.info("Record already exists in the database: {}".format(uniq_id))
-                    pass
+                    # try to insert the JSON object
+                    try:
+                        cur.execute("INSERT INTO backpage_raw (uniq_id, ad) VALUES (%s, %s)", [uniq_id, ad_json])
+                        logger.info("New record inserted: {}".format(uniq_id))
+
+                    # if it's not successful, log the event and move on
+                    except:
+                        #logger.info("Record already exists in the database: {}".format(uniq_id))
+                        pass
+
+            except urllib2.HTTPError as err:
+                logger.info("{}: {}".format(err, url))
 
 if __name__ == "__main__":
     cli()
