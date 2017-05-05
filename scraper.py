@@ -75,10 +75,12 @@ def get_urls(landing_page, sleep_time):
             elif "No matches found." in soup.get_text():
                 break
 
-        # if it doesn't open, take a break, refresh IP, and try again
+        # if it doesn't open, report the error, take a break, refresh the IP address and move on
         except urllib2.HTTPError as err:
-            logger.info("HTTP Error:{}".format(url))
-            logger.info(err)
+            logger.error("{} : {}".format(err, url))
+            logger.info("Sleeping for {} seconds".format(sleep_time))
+            sleep(sleep_time)
+            enable_tor()
             pass
 
     # log total number of URLs from each city/category
@@ -125,7 +127,7 @@ def create_uniq_id(data):
 
 # MAIN PROGRAM
 @click.command()
-@click.option('--sleep_time', type=int, default=60, help='Number of seconds to sleep if there is a error getting the URLs (default=60)')
+@click.option('--sleep_time', type=int, default=100, help='Number of seconds to sleep if there is a HTTP Error (default=100)')
 @click.option('--category_file', default='./params/default_categories.txt', help='File for TXT file of categories to scrape (default: ./params/default_categories.txt')
 @click.option('--city_file', default='./params/default_cities.txt', help='File for TXT file of cities to scrape (default: ./params/default_cities.txt')
 def cli(sleep_time, category_file, city_file):
@@ -205,15 +207,21 @@ def cli(sleep_time, category_file, city_file):
                     # try to insert the JSON object
                     try:
                         cur.execute("INSERT INTO backpage_raw (uniq_id, ad) VALUES (%s, %s)", [uniq_id, ad_json])
-                        logger.info("New record inserted: {}".format(uniq_id))
+                        logger.info("New record inserted: {}".format(url))
 
                     # if it's not successful, log the event and move on
                     except:
                         #logger.info("Record already exists in the database: {}".format(uniq_id))
                         pass
 
+            # if it doesn't open, report the error, take a break, refresh the IP address and move on
             except urllib2.HTTPError as err:
-                logger.info("{}: {}".format(err, url))
+                logger.error("{} : {}".format(err, url))
+                logger.info("Sleeping for {} seconds".format(sleep_time))
+                sleep(sleep_time)
+                enable_tor()
+                pass
+
 
 if __name__ == "__main__":
     cli()
