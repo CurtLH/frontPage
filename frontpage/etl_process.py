@@ -251,7 +251,7 @@ def cli(batch_size, sleep_time):
     """ETL process for Backpage data"""
 
     # load CSV file with cities and states
-    site_map = load_city_state_as_dict('./URLs.csv')
+    site_map = load_city_state_as_dict('./params/URLs.csv')
 
     # connect to the database
     try:
@@ -340,7 +340,7 @@ def cli(batch_size, sleep_time):
         else:
    
             # conform databases and make sure the same records are in both
-            conform_dbs(cur)
+            #conform_dbs(cur)
 
             # wait and see if there is something else to load
             logging.info("Waiting for new records...sleeping for {} seconds".format(sleep_time))
