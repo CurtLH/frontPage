@@ -1,0 +1,9 @@
+2017-05-04 23:15:07 INFO scraper - enable_tor: TOR enabled: 91.197.234.102
+2017-05-04 23:15:07 INFO scraper - cli: Successfully connected to the database
+2017-05-04 23:15:12 INFO scraper - get_urls: Success: http://columbusga.backpage.com/womenseekmen/?page=1
+2017-05-04 23:15:18 INFO scraper - get_urls: Success: http://columbusga.backpage.com/womenseekmen/?page=2
+2017-05-04 23:15:23 INFO scraper - get_urls: Success: http://columbusga.backpage.com/womenseekmen/?page=3
+2017-05-04 23:15:24 INFO scraper - get_urls: Number of ads in columbusga - womenseekmen: 827
+2017-05-04 23:15:25 INFO scraper - cli: New record inserted: 2017-05-05 00:03:00-56882797-columbusga-WomenSeekMen
+2017-05-04 23:15:26 INFO scraper - cli: New record inserted: 2017-05-04 23:58:00-62750263-columbusga-WomenSeekMen
+2017-05-04 23:17:11 INFO scraper - cli: New record inserted: 2017-05-04 23:53:00-62986708-columbusga-WomenSeekMen
