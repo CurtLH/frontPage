@@ -5,20 +5,20 @@ requirements = [
 ]
 
 setup(
-    name='fleaBay',
+    name='frontPage',
     version='0.1.0',
     description="Short description",
     author="Curtis Hampton",
     author_email='CurtLHampton@gmail.com',
-    url='https://github.com/CurtLH/fleaBay',
-    packages=['fleabay'],
+    url='https://github.com/CurtLH/frontPage',
+    packages=['frontpage'],
     entry_points={
         'console_scripts': [
-            'fleabay=fleabay.cli:cli'
+            'frontpage=frontpage.cli:cli'
         ]
     },
     install_requires=requirements,
-    keywords='fleaBay',
+    keywords='frontPage',
     classifiers=[
         'Programming Language :: Python :: 2.7',
         'Programming Language :: Python :: 3.6',

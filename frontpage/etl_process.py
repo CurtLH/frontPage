@@ -9,7 +9,6 @@ from bs4 import BeautifulSoup as bs
 import re
 import urlparse
 import urllib
-import urllib2
 import psycopg2
 import json
 from random import random

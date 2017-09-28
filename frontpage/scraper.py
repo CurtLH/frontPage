@@ -7,7 +7,7 @@ import logging
 from datetime import datetime
 from bs4 import BeautifulSoup as bs
 import re
-import urllib2
+import urllib
 import psycopg2
 import json
 from random import random
@@ -36,7 +36,7 @@ def enable_tor():
 
     # log new IP address
     socket.getaddrinfo = getaddrinfo
-    r = urllib2.urlopen('http://my-ip.herokuapp.com').read()
+    r = urllib.urlopen('http://my-ip.herokuapp.com').read()
     logger.info("TOR enabled: {}".format(r.split('"')[3]))
 
 
@@ -57,7 +57,7 @@ def get_urls(landing_page, sleep_time):
 
         # try to open the URL
         try:
-            soup = bs(urllib2.urlopen(url), "html.parser")
+            soup = bs(urllib.urlopen(url), "html.parser")
    
             # look for the links
             if "No matches found." not in soup.get_text():
@@ -76,7 +76,7 @@ def get_urls(landing_page, sleep_time):
                 break
 
         # if it doesn't open, report the error, take a break, refresh the IP address and move on
-        except urllib2.HTTPError as err:
+        except urllib.HTTPError as err:
             logger.error("{} : {}".format(err, url))
             logger.info("Sleeping for {} seconds".format(sleep_time))
             sleep(sleep_time)
@@ -92,7 +92,7 @@ def get_urls(landing_page, sleep_time):
 def open_url(url):
 
     # open URL and return the response item
-    response = urllib2.urlopen(url)
+    response = urllib.urlopen(url)
 
     return response
 
@@ -215,7 +215,7 @@ def cli(sleep_time, category_file, city_file):
                         pass
 
             # if it doesn't open, report the error, take a break, refresh the IP address and move on
-            except urllib2.HTTPError as err:
+            except urllib.HTTPError as err:
                 logger.error("{} : {}".format(err, url))
                 logger.info("Sleeping for {} seconds".format(sleep_time))
                 sleep(sleep_time)
