@@ -66,9 +66,6 @@ def get_urls(landing_page, sleep_time):
                 for element in soup.findAll("div", {"class": re.compile("cat*")}):
                     urls.append(element.a["href"])
 
-                # log event
-                logger.info("Success: {}".format(url))
-
                 # increment page number by 1
                 page_num += 1
 
@@ -82,9 +79,6 @@ def get_urls(landing_page, sleep_time):
             sleep(sleep_time)
             enable_tor()
             pass
-
-    # log total number of URLs from each city/category
-    logger.info("Number of ads in {} - {}: {}".format(city, category, len(urls)))
 
     return urls
 
@@ -174,45 +168,64 @@ def cli(sleep_time, category_file, city_file):
     # for each landing page (i.e.: Baton Rouge WomenSeekMen)
     for line in city_category:
 
+        # log the  current city and category
+        logger.info("Starting scraper for {} {}".format(line[0], line[1]))
+
         # create url to get the links for the ads
         base_url = "http://" + line[0] + ".backpage.com/" + line[1] + "/"
 
         # go through all pages to get links to for all ads for that city/cateory
         ad_urls = get_urls(base_url, sleep_time)
 
-        # go to each ad and store content
-        for url in ad_urls:
+        # log the number of ads found in the current city and category
+        logger.info("{} ads found in {} {}".format(len(ad_urls), line[0], line[1]))
 
-            # try to open the URL
-            try:
+        # start counter for ads that have already been collected
+        duplicate_cnt = 0
 
-                # query URL  
-                response = open_url(url)
+            # go to each ad and store content
+            for url in ad_urls:
 
-                # try each url and store HTML data in dict
-                ad = store_html_in_dict(response)
+                # once there are more than 10 duplicates identified for a city/category
+                # move onto the next city/category
+                while duplicate_cnt > 10:
+                    logger.info("Duplicate ad #{}".format(duplicate_cnt))
+                    pass
 
-                # if the results did not come back
-                if ad is not False:
 
-                    # create unique_id for ad
-                    uniq_id = create_uniq_id(ad)
+                # otherwise, try to collect the ad
+                else:
 
-                    # add the unique id to the dict
-                    ad['uniq_id'] = uniq_id
-
-                    # convert the dict to JSON object
-                    ad_json = json.dumps(ad)
-
-                    # try to insert the JSON object
+                    # try to open the URL
                     try:
-                        cur.execute("INSERT INTO backpage_raw (uniq_id, ad) VALUES (%s, %s)", [uniq_id, ad_json])
-                        logger.info("New record inserted: {}".format(url))
 
-                    # if it's not successful, log the event and move on
-                    except:
-                        #logger.info("Record already exists in the database: {}".format(uniq_id))
-                        pass
+                        # query URL  
+                        response = open_url(url)
+
+                        # try each url and store HTML data in dict
+                        ad = store_html_in_dict(response)
+
+                        # if the results did not come back
+                        if ad is not False:
+
+                            # create unique_id for ad
+                            uniq_id = create_uniq_id(ad)
+
+                            # add the unique id to the dict
+                            ad['uniq_id'] = uniq_id
+
+                            # convert the dict to JSON object
+                            ad_json = json.dumps(ad)
+
+                            # try to insert the JSON object
+                            try:
+                                cur.execute("INSERT INTO backpage_raw (uniq_id, ad) VALUES (%s, %s)", [uniq_id, ad_json])
+                                logger.info("New record inserted: {}".format(url))
+
+                            # if it's not successful, log the event and move on
+                            except:
+                                logger.info("Record already exists in the database: {}".format(uniq_id))
+                                pass
 
             # if it doesn't open, report the error, take a break, refresh the IP address and move on
             except urllib.HTTPError as err:
