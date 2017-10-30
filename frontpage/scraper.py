@@ -186,51 +186,41 @@ def cli(sleep_time, category_file, city_file):
         # go to each ad and store content
         for url in ad_urls:
 
-            # once there are more than 10 duplicates identified for a city/category
-            # move onto the next city/category
-            while duplicate_cnt <= 10:
+            # try to open the URL
+            try:
 
-                # try to open the URL
-                try:
+                # query URL  
+                response = open_url(url)
 
-                    # query URL  
-                    response = open_url(url)
+                # try each url and store HTML data in dict
+                ad = store_html_in_dict(response)
 
-                    # try each url and store HTML data in dict
-                    ad = store_html_in_dict(response)
+                # if the results did not come back
+                if ad is not False:
 
-                    # if the results did not come back
-                    if ad is not False:
+                    # create unique_id for ad
+                    uniq_id = create_uniq_id(ad)
 
-                        # create unique_id for ad
-                        uniq_id = create_uniq_id(ad)
+                    # add the unique id to the dict
+                    ad['uniq_id'] = uniq_id
 
-                        # add the unique id to the dict
-                        ad['uniq_id'] = uniq_id
+                    # convert the dict to JSON object
+                    ad_json = json.dumps(ad)
 
-                        # convert the dict to JSON object
-                        ad_json = json.dumps(ad)
+                    # try to insert the JSON object
+                    try:
+                        cur.execute("INSERT INTO backpage_raw (uniq_id, ad) VALUES (%s, %s)", [uniq_id, ad_json])
+                        logger.info("New record inserted: {}".format(url))
 
-                        # try to insert the JSON object
-                        try:
-                            cur.execute("INSERT INTO backpage_raw (uniq_id, ad) VALUES (%s, %s)", [uniq_id, ad_json])
-                            logger.info("New record inserted: {}".format(url))
+                    # if it's not successful, log the event and move on
+                    except:
+                        logger.info("Record already exists in the database: {}".format(uniq_id))
+                        pass
 
-                        # if it's not successful, log the event and move on
-                        except:
-                            duplicate_cnt += 1
-                            logger.info("Record already exists in the database: {}".format(uniq_id))
-                            pass
-
-                # if it doesn't open, report the error, take a break, refresh the IP address and move on
-                except urllib.HTTPError as err:
-                    logger.error("{} : {}".format(err, url))
-                    logger.info("Sleeping for {} seconds".format(sleep_time))
-                    sleep(sleep_time)
-                    enable_tor()
-                    pass
-
-            # if the duplicate counter is greater than 10, move onto the next city/category
-            else:
-                logger.info("Number of duplicates for {} {} exceeds limit".format(line[0], line[1]))
-                break
+            # if it doesn't open, report the error, take a break, refresh the IP address and move on
+            except urllib.HTTPError as err:
+                logger.error("{} : {}".format(err, url))
+                logger.info("Sleeping for {} seconds".format(sleep_time))
+                sleep(sleep_time)
+                enable_tor()
+                pass
