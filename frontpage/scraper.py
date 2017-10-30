@@ -122,8 +122,8 @@ def create_uniq_id(data):
 # MAIN PROGRAM
 @click.command()
 @click.option('--sleep_time', type=int, default=100, help='Number of seconds to sleep if there is a HTTP Error (default=100)')
-@click.option('--category_file', default='./params/default_categories.txt', help='File for TXT file of categories to scrape (default: ./params/default_categories.txt')
-@click.option('--city_file', default='./params/default_cities.txt', help='File for TXT file of cities to scrape (default: ./params/default_cities.txt')
+@click.option('--category_file', default='./frontpage/params/default_categories.txt', help='File for TXT file of categories to scrape (default: ./frontpage/params/default_categories.txt')
+@click.option('--city_file', default='./frontpage/params/default_cities.txt', help='File for TXT file of cities to scrape (default: ./frontpage/params/default_cities.txt')
 def cli(sleep_time, category_file, city_file):
 
     """Web scraper for collecting ad information"""
