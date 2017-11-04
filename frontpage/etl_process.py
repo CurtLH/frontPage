@@ -251,7 +251,7 @@ def cli(batch_size, sleep_time):
     """ETL process for Backpage data"""
 
     # load CSV file with cities and states
-    site_map = load_city_state_as_dict('./params/URLs.csv')
+    site_map = load_city_state_as_dict('./frontpage/params/URLs.csv')
 
     # connect to the database
     try:
